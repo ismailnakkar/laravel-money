@@ -34,7 +34,7 @@ jobs:
           extensions: bcmath
           coverage: none
 
-      # Laravel 13.0, the prefer-lowest floor, has advisories; only advisory blocking is turned off.
+      # Blocking would make prefer-lowest skip to a later Laravel than the floor.
       - run: composer update --${{ matrix.deps }} --prefer-dist --no-interaction --no-progress
         env:
           COMPOSER_POLICY_ADVISORIES_BLOCK: ${{ matrix.deps == 'prefer-lowest' && '0' || '1' }}

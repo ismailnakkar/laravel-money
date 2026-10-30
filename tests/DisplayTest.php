@@ -66,7 +66,9 @@ final class DisplayTest extends TestCase
 
     public function test_the_config_can_be_published(): void
     {
-        $this->assertContains(config_path('money.php'), ServiceProvider::pathsToPublish(MoneyServiceProvider::class, 'money-config'));
+        $paths = ServiceProvider::pathsToPublish(MoneyServiceProvider::class, 'money-config');
+
+        $this->assertFileExists((string)array_search(config_path('money.php'), $paths, true));
     }
 
     public function test_the_call_can_name_its_decimals(): void
@@ -91,6 +93,26 @@ final class DisplayTest extends TestCase
         $this->assertSame('$4.8M', Money::compact('4899999.990000000'));
         $this->assertSame('$1.2B', Money::compact('1234567890.000000000'));
         $this->assertSame('$999', Money::compact('999.990000000'));
+    }
+
+    public function test_a_compact_total_keeps_the_zeros_of_its_whole_part(): void
+    {
+        $this->assertSame('$10K', Money::compact('10000'));
+        $this->assertSame('$100M', Money::compact('100000000'));
+        $this->assertSame('$300B', Money::compact('300000000000'));
+    }
+
+    public function test_a_compact_total_leaves_a_symbol_that_looks_like_a_decimal_alone(): void
+    {
+        config(['money.symbol' => '.0']);
+
+        $this->assertSame('.05.1K', Money::compact('5150'));
+    }
+
+    public function test_a_compact_total_past_its_top_unit_is_still_grouped(): void
+    {
+        $this->assertSame('$1,234.5B', Money::compact('1234567890000'));
+        $this->assertSame('-$1,234.5B', Money::compact('-1234567890000'));
     }
 
     public function test_a_compact_negative_reads_like_any_other_negative(): void

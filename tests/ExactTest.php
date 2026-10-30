@@ -34,11 +34,15 @@ final class ExactTest extends TestCase
         $this->assertSame('-5', Money::of(-5));
     }
 
-    /** @return iterable<array{string|float}> */
+    /** @return iterable<array{string|float|bool}> */
     public static function notExact(): iterable
     {
         yield 'a float' => [0.5];
         yield 'a whole float' => [5.0];
+        yield 'a float that is not a number' => [NAN];
+        yield 'an infinite float' => [INF];
+        yield 'true' => [true];
+        yield 'false' => [false];
         yield 'a float cast to a string' => ['7.0E-5'];
         yield 'capital exponent' => ['1E3'];
         yield 'small exponent' => ['1e3'];
@@ -58,15 +62,29 @@ final class ExactTest extends TestCase
     }
 
     #[DataProvider('notExact')]
-    public function test_anything_else_is_refused(string|float $amount): void
+    public function test_anything_else_is_refused(string|float|bool $amount): void
     {
         $this->expectException(InvalidAmount::class);
 
         Money::of($amount);
     }
 
+    public function test_a_refused_float_says_it_is_a_float(): void
+    {
+        $this->expectExceptionMessage('[float 0.5] is not an exact decimal.');
+
+        Money::of(0.5);
+    }
+
+    public function test_a_refused_bool_says_it_is_a_bool(): void
+    {
+        $this->expectExceptionMessage('[bool false] is not an exact decimal.');
+
+        Money::of(false);
+    }
+
     #[DataProvider('notExact')]
-    public function test_every_method_refuses_it_the_same_way(string|float $amount): void
+    public function test_every_method_refuses_it_the_same_way(string|float|bool $amount): void
     {
         foreach ([
             static fn () => Money::cut($amount, 2),
@@ -124,6 +142,7 @@ final class ExactTest extends TestCase
     public function test_percent_of_a_negative_amount_keeps_its_sign(): void
     {
         $this->assertSame('-0.15', Money::percent('-1.5', '10', 2));
+        $this->assertSame('-0.000100912', Money::percent('-0.001345500', '7.5'));
     }
 
     public function test_percent_loses_no_digit_before_the_cut(): void
@@ -134,7 +153,12 @@ final class ExactTest extends TestCase
         );
     }
 
-    public function test_percent_matches_how_nine_decimal_credits_are_worked_out_today(): void
+    public function test_percent_keeps_every_digit_however_long(): void
+    {
+        $this->assertSame('0.' . str_repeat('0', 101) . '1', Money::percent('0.' . str_repeat('0', 99) . '1', '1', 102));
+    }
+
+    public function test_percent_matches_bcmul_then_bcdiv_at_nine_decimals(): void
     {
         foreach (['0.000000001', '0.000100912', '0.001345500', '1.234567890', '99999.999999999'] as $amount) {
             foreach (['0.000001', '7.5', '12.345678', '100'] as $percent) {
@@ -143,7 +167,7 @@ final class ExactTest extends TestCase
         }
     }
 
-    public function test_percent_matches_how_five_decimal_credits_are_worked_out_today(): void
+    public function test_percent_matches_bcmul_then_bcdiv_then_bcround_at_five_decimals(): void
     {
         foreach (['0.00001', '0.00002', '0.00007', '0.00015', '0.12345', '1.23456', '9.99999', '1234.56789'] as $amount) {
             foreach (['0', '1', '7.5', '12.5', '33.33333', '50', '75', '100'] as $percent) {
