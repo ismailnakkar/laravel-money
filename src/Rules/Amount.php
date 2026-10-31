@@ -15,7 +15,7 @@ final readonly class Amount implements ValidationRule
 
     public function __construct(private int $decimals = Money::SCALE, string|int|float|bool $max = '999999999')
     {
-        $this->max = Money::of($max);
+        $this->max = Money::of($max)->value;
     }
 
     public function validate(string $attribute, mixed $value, Closure $fail): void
@@ -26,7 +26,7 @@ final readonly class Amount implements ValidationRule
             $fail('validation.decimal')->translate(['decimal' => $this->decimals > 0 ? "0-{$this->decimals}" : '0']);
         } elseif (str_starts_with((string)$value, '-')) {
             $fail('validation.min.numeric')->translate(['min' => '0']);
-        } elseif (bccomp(Money::of($value), $this->max, $this->decimals) > 0) {
+        } elseif (Money::of($value)->isGreaterThan($this->max)) {
             $fail('validation.max.numeric')->translate(['max' => $this->max]);
         }
     }

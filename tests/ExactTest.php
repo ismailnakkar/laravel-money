@@ -25,13 +25,13 @@ final class ExactTest extends TestCase
     #[DataProvider('exactDecimals')]
     public function test_an_exact_decimal_comes_back_as_given(string $amount): void
     {
-        $this->assertSame($amount, Money::of($amount));
+        $this->assertSame($amount, Money::of($amount)->value);
     }
 
     public function test_an_integer_comes_back_as_a_string(): void
     {
-        $this->assertSame('5', Money::of(5));
-        $this->assertSame('-5', Money::of(-5));
+        $this->assertSame('5', Money::of(5)->value);
+        $this->assertSame('-5', Money::of(-5)->value);
     }
 
     /** @return iterable<array{string|float|bool}> */
@@ -87,9 +87,13 @@ final class ExactTest extends TestCase
     public function test_every_method_refuses_it_the_same_way(string|float|bool $amount): void
     {
         foreach ([
-            static fn () => Money::cut($amount, 2),
-            static fn () => Money::percent($amount, '50'),
-            static fn () => Money::percent('5', $amount),
+            static fn () => Money::of('5')->add($amount),
+            static fn () => Money::of('5')->subtract($amount),
+            static fn () => Money::of('5')->multiply($amount),
+            static fn () => Money::of('5')->divide($amount),
+            static fn () => Money::of('5')->percent($amount),
+            static fn () => Money::of('5')->compare($amount),
+            static fn () => Money::sum([$amount]),
             static fn () => Money::balance($amount),
             static fn () => Money::price($amount),
             static fn () => Money::compact($amount),
@@ -105,64 +109,64 @@ final class ExactTest extends TestCase
 
     public function test_cut_truncates_unless_told_otherwise(): void
     {
-        $this->assertSame('1.99', Money::cut('1.999', 2));
-        $this->assertSame('-1.99', Money::cut('-1.999', 2));
-        $this->assertSame('0.000100912', Money::cut('0.00010091250', 9));
+        $this->assertSame('1.99', Money::of('1.999')->cut(2)->value);
+        $this->assertSame('-1.99', Money::of('-1.999')->cut(2)->value);
+        $this->assertSame('0.000100912', Money::of('0.00010091250')->cut(9)->value);
     }
 
     public function test_cut_pads_to_the_decimals_asked_for(): void
     {
-        $this->assertSame('5.00', Money::cut('5', 2));
-        $this->assertSame('1234.567890', Money::cut('1234.56789', 6));
-        $this->assertSame('5', Money::cut('5.99', 0));
+        $this->assertSame('5.00', Money::of('5')->cut(2)->value);
+        $this->assertSame('1234.567890', Money::of('1234.56789')->cut(6)->value);
+        $this->assertSame('5', Money::of('5.99')->cut(0)->value);
     }
 
     public function test_cut_takes_the_rounding_mode_at_the_call(): void
     {
-        $this->assertSame('1234.57', Money::cut('1234.56789', 2, RoundingMode::HalfAwayFromZero));
-        $this->assertSame('0.00002', Money::cut('0.000015', 5, RoundingMode::HalfAwayFromZero));
-        $this->assertSame('0.12', Money::cut('0.125', 2, RoundingMode::HalfEven));
+        $this->assertSame('1234.57', Money::of('1234.56789')->cut(2, RoundingMode::HalfAwayFromZero)->value);
+        $this->assertSame('0.00002', Money::of('0.000015')->cut(5, RoundingMode::HalfAwayFromZero)->value);
+        $this->assertSame('0.12', Money::of('0.125')->cut(2, RoundingMode::HalfEven)->value);
     }
 
     public function test_a_cut_never_leaves_a_negative_zero(): void
     {
-        $this->assertSame('0.00', Money::cut('-0.001', 2));
+        $this->assertSame('0.00', Money::of('-0.001')->cut(2)->value);
     }
 
     public function test_percent_is_cut_only_once(): void
     {
-        $this->assertSame('0.00002', Money::percent('0.00002', '75', 5, RoundingMode::HalfAwayFromZero));
-        $this->assertSame('0.000100912', Money::percent('0.001345500', '7.5'));
+        $this->assertSame('0.00002', Money::of('0.00002')->percent('75', 5, RoundingMode::HalfAwayFromZero)->value);
+        $this->assertSame('0.000100912', Money::of('0.001345500')->percent('7.5')->value);
 
         // Rounded at 3 places first it would be 1.445, and then 1.45.
-        $this->assertSame('1.44', Money::percent('1.4445', '100', 2, RoundingMode::HalfAwayFromZero));
-        $this->assertSame('1.44', Money::percent('1.4449999999999', '100', 2, RoundingMode::HalfAwayFromZero));
+        $this->assertSame('1.44', Money::of('1.4445')->percent('100', 2, RoundingMode::HalfAwayFromZero)->value);
+        $this->assertSame('1.44', Money::of('1.4449999999999')->percent('100', 2, RoundingMode::HalfAwayFromZero)->value);
     }
 
     public function test_percent_of_a_negative_amount_keeps_its_sign(): void
     {
-        $this->assertSame('-0.15', Money::percent('-1.5', '10', 2));
-        $this->assertSame('-0.000100912', Money::percent('-0.001345500', '7.5'));
+        $this->assertSame('-0.15', Money::of('-1.5')->percent('10', 2)->value);
+        $this->assertSame('-0.000100912', Money::of('-0.001345500')->percent('7.5')->value);
     }
 
     public function test_percent_loses_no_digit_before_the_cut(): void
     {
         $this->assertSame(
             bcdiv(bcmul('0.123456789', '12.345678', 40), '100', 17),
-            Money::percent('0.123456789', '12.345678', 17),
+            Money::of('0.123456789')->percent('12.345678', 17)->value,
         );
     }
 
     public function test_percent_keeps_every_digit_however_long(): void
     {
-        $this->assertSame('0.' . str_repeat('0', 101) . '1', Money::percent('0.' . str_repeat('0', 99) . '1', '1', 102));
+        $this->assertSame('0.' . str_repeat('0', 101) . '1', Money::of('0.' . str_repeat('0', 99) . '1')->percent('1', 102)->value);
     }
 
     public function test_percent_matches_bcmul_then_bcdiv_at_nine_decimals(): void
     {
         foreach (['0.000000001', '0.000100912', '0.001345500', '1.234567890', '99999.999999999'] as $amount) {
             foreach (['0.000001', '7.5', '12.345678', '100'] as $percent) {
-                $this->assertSame(bcdiv(bcmul($amount, $percent, 9), '100', 9), Money::percent($amount, $percent), "{$percent}% of {$amount}");
+                $this->assertSame(bcdiv(bcmul($amount, $percent, 9), '100', 9), Money::of($amount)->percent($percent)->value, "{$percent}% of {$amount}");
             }
         }
     }
@@ -173,7 +177,7 @@ final class ExactTest extends TestCase
             foreach (['0', '1', '7.5', '12.5', '33.33333', '50', '75', '100'] as $percent) {
                 $this->assertSame(
                     bcround(bcdiv(bcmul($amount, $percent, 20), '100', 22), 5),
-                    Money::percent($amount, $percent, 5, RoundingMode::HalfAwayFromZero),
+                    Money::of($amount)->percent($percent, 5, RoundingMode::HalfAwayFromZero)->value,
                     "{$percent}% of {$amount}",
                 );
             }

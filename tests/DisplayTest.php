@@ -21,6 +21,13 @@ final class DisplayTest extends TestCase
         $this->assertSame('$0.0020', Money::balance('0.002000000'));
     }
 
+    public function test_a_format_takes_a_money_as_it_takes_a_string(): void
+    {
+        $this->assertSame('$10.1234', Money::balance(Money::of('10.123456789')));
+        $this->assertSame('$9.99', Money::price(Money::of('9.999')));
+        $this->assertSame('$5.1K', Money::compact(Money::of('5150')));
+    }
+
     public function test_a_price_keeps_two(): void
     {
         $this->assertSame('$9.99', Money::price('9.990000000'));
