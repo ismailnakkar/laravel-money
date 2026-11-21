@@ -1,6 +1,6 @@
 {
     "name": "ismailnakkar/laravel-money",
-    "description": "Money as an exact decimal string in Laravel: check it, cut it, print it. No floats, down to nine decimals.",
+    "description": "Money as an exact decimal in Laravel: an immutable amount with its own cast, exact sums, truncating formats and a validation rule. No floats.",
     "keywords": [
         "laravel",
         "money",

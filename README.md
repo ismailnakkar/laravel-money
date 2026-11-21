@@ -8,7 +8,8 @@ a float.
 
 ## Install
 
-Needs PHP 8.4+, `ext-bcmath` and Laravel 13.
+Needs PHP 8.4+, `ext-bcmath`, Laravel 13 and a database with a real `DECIMAL`, such as MariaDB or MySQL. SQLite,
+Laravel's default, has none: it stores a float and reads back a float or an int, and `Money` refuses a float.
 
 ```bash
 composer require ismailnakkar/laravel-money
@@ -16,29 +17,22 @@ composer require ismailnakkar/laravel-money
 
 The namespace is `ExactMoney\`, because `moneyphp/money` already owns `Money\Money`.
 
-SQLite, Laravel's default, has no `DECIMAL`: it stores a float and reads back a float or an int, and `Money` refuses a
-float. Run the app and its tests on MariaDB or MySQL: in `phpunit.xml`, change `DB_CONNECTION` and point `DB_DATABASE`
-at a test database of its own, in place of `:memory:`.
-
 ## Quick start
 
 ```php
 use App\Models\User;
 use ExactMoney\Money;
-use Illuminate\Database\Eloquent\Model;
 
 // In the migration.
 $table->decimal('balance', 18, 9)->default(0);
 
-// On the model.
-class User extends Model
+// In the User model.
+protected function casts(): array
 {
-    protected function casts(): array
-    {
-        return ['balance' => Money::class];
-    }
+    return ['balance' => Money::class];
 }
 
+// Anywhere.
 $credit = Money::of('0.001345500')->percent('7.5'); // 0.000100912
 User::whereKey($id)->increment('balance', $credit->value);
 
@@ -136,18 +130,16 @@ Money::price('4.999');             // '$4.99'
 Money::compact('5150');            // '$5.1K'
 ```
 
-Each takes a `Money`, a string or an int. `balance()` is for what a member holds or earned, `price()` for a price, a fee or a payment, always at two decimals,
-and `compact()` for a headline figure: `K`, `M` or `B` with at most one decimal, or whole units below 1,000. Every
-format truncates, and the sign goes before the symbol: `-$1,234.56`. The output is the same in every language: it does
-not use Laravel's `Number` or ICU, whose symbol changes by locale (`$US` in French).
+Each takes a `Money`, a string or an int. `balance()` is for what a member holds or earned, `price()` for a price, a fee
+or a payment, always at two decimals, and `compact()` for a headline figure: `K`, `M` or `B` with at most one decimal, or
+whole units below 1,000. Every format truncates, and the sign goes before the symbol: `-$1,234.56`. The output is the
+same in every language: it does not use Laravel's `Number` or ICU, whose symbol changes by locale (`$US` in French).
 
 `balance()` takes its decimals from the config, or from the call:
 
 ```php
 Money::balance('12345.67', 0); // '$12,345'
 ```
-
-Pass them from the call when an admin can change them: a queue worker reads config once.
 
 In Blade, import the class: there is no facade.
 
@@ -187,6 +179,31 @@ php artisan vendor:publish --tag=money-config
 |--------------------|---------|----------------------------------------|
 | `symbol`           | `$`     | Printed before every amount.           |
 | `balance_decimals` | `4`     | The decimals `Money::balance()` shows. |
+
+## API
+
+| Call                                                                                    | Gives                                                         |
+|-----------------------------------------------------------------------------------------|---------------------------------------------------------------|
+| `Money::of($amount)`, `Money::zero()`, `Money::sum($amounts)`                           | A `Money`.                                                    |
+| `add()`, `subtract()`, `multiply()`, `divide($divisor, $decimals = 9)`                  | A new `Money`.                                                |
+| `cut($decimals, $mode = TowardsZero)`                                                   | A new `Money`, padded or cut to `$decimals`.                  |
+| `percent($percent, $decimals = 9, $mode = TowardsZero)`                                 | A new `Money`, cut once.                                      |
+| `compare()`, `equals()`, `isGreaterThan()`, `isLessThan()`, `isAtLeast()`, `isAtMost()` | An `int` for `compare()`, a `bool` for the rest.              |
+| `isZero()`, `isPositive()`, `isNegative()`                                              | A `bool`.                                                     |
+| `Money::balance($amount, $decimals = null)`, `Money::price()`, `Money::compact()`       | A printed string, such as `$1,234.5678`.                      |
+| `->value`, `(string)`, `json_encode()`                                                  | The digits, such as `'1234.567800000'`.                       |
+| `'balance' => Money::class` in `casts()`                                                | The cast.                                                     |
+| `new ExactMoney\Rules\Amount(decimals: 9, max: '999999999')`                            | The validation rule.                                          |
+| `Money::SCALE`                                                                          | `9`: the decimals `divide()` and `percent()` keep by default. |
+
+An amount argument is a `Money`, a string or an int; a float, a bool or an inexact string throws `InvalidAmount`. `$mode`
+is PHP's `RoundingMode`.
+
+## Testing
+
+Run your suite on the same database as the app, not SQLite: in `phpunit.xml`, change `DB_CONNECTION` and point
+`DB_DATABASE` at a test database of its own, in place of `:memory:`. A factory or seeder gives a cast column a string or
+an int, never a float.
 
 ## What it leaves out
 

@@ -16,6 +16,7 @@ final readonly class Money implements Castable, JsonSerializable, Stringable
     /** The scale to divide at: no money column keeps more. */
     public const int SCALE = 9;
 
+    /** compact()'s suffixes, largest first: an amount takes the first one it reaches. */
     private const array UNITS = ['B' => '1000000000', 'M' => '1000000', 'K' => '1000'];
 
     /** @param  numeric-string  $value */
@@ -24,8 +25,8 @@ final readonly class Money implements Castable, JsonSerializable, Stringable
     /**
      * The amount, once it is known to be an exact decimal. Every method checks through here.
      *
-     * A float or a bool is typed in only to be refused: without it, a file with no strict_types hands 99.99 over as the
-     * int 99, and false as 0.
+     * Floats and bools are in the type only to be refused: a file without strict_types would hand 99.99 over as the int
+     * 99, and false as 0.
      */
     public static function of(self|string|int|float|bool $amount): self
     {
@@ -66,17 +67,17 @@ final readonly class Money implements Castable, JsonSerializable, Stringable
 
     public function add(self|string|int|float|bool $amount): self
     {
-        return self::exact($this->number()->add(self::of($amount)->number()));
+        return self::fromNumber($this->number()->add(self::of($amount)->number()));
     }
 
     public function subtract(self|string|int|float|bool $amount): self
     {
-        return self::exact($this->number()->sub(self::of($amount)->number()));
+        return self::fromNumber($this->number()->sub(self::of($amount)->number()));
     }
 
     public function multiply(self|string|int|float|bool $factor): self
     {
-        return self::exact($this->number()->mul(self::of($factor)->number()));
+        return self::fromNumber($this->number()->mul(self::of($factor)->number()));
     }
 
     /** Truncated at $decimals, as bcdiv() is. */
@@ -94,7 +95,7 @@ final readonly class Money implements Castable, JsonSerializable, Stringable
     /** The exact product, cut once: rounding twice can land on the other side of a tie. */
     public function percent(self|string|int|float|bool $percent, int $decimals = self::SCALE, RoundingMode $mode = RoundingMode::TowardsZero): self
     {
-        return self::exact($this->number()->mul(self::of($percent)->number())->div('100'))->cut($decimals, $mode);
+        return self::fromNumber($this->number()->mul(self::of($percent)->number())->div('100'))->cut($decimals, $mode);
     }
 
     /** Negative, zero or positive, as `<=>` is. */
@@ -160,7 +161,9 @@ final readonly class Money implements Castable, JsonSerializable, Stringable
 
         foreach (self::UNITS as $suffix => $unit) {
             if (bccomp($size, $unit, 0) >= 0) {
-                return preg_replace('/\.0$/', '', self::format(bcdiv($amount, $unit, 1), 1)) . $suffix;
+                $scaled = bcdiv($amount, $unit, 1);
+
+                return self::format($scaled, str_ends_with($scaled, '.0') ? 0 : 1) . $suffix;
             }
         }
 
@@ -188,7 +191,7 @@ final readonly class Money implements Castable, JsonSerializable, Stringable
         return new Number($this->value);
     }
 
-    private static function exact(Number $number): self
+    private static function fromNumber(Number $number): self
     {
         return self::of($number->value);
     }

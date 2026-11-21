@@ -8,7 +8,9 @@ use ExactMoney\InvalidAmount;
 use ExactMoney\Money;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use InvalidArgumentException;
 
 /** On text columns: SQLite has no DECIMAL, and would read back the float Money refuses. */
 final class CastTest extends TestCase
@@ -70,6 +72,20 @@ final class CastTest extends TestCase
 
         $wallet->decrement('balance', '0.5');
         $this->assertSame('1.25000', $wallet->balance?->value);
+    }
+
+    public function test_a_query_takes_a_money_but_its_increment_needs_the_digits(): void
+    {
+        DB::table('wallets')->insert(['balance' => '1.5']);
+
+        $this->assertSame(1, DB::table('wallets')->where('balance', Money::of('1.5'))->count());
+
+        DB::table('wallets')->update(['balance' => Money::of('2.5')]);
+        $this->assertSame('2.5', DB::table('wallets')->value('balance'));
+
+        $this->expectException(InvalidArgumentException::class);
+
+        DB::table('wallets')->increment('balance', Money::of('1'));
     }
 
     public function test_an_equal_amount_leaves_the_model_clean(): void

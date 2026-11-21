@@ -7,7 +7,7 @@ namespace ExactMoney;
 use Illuminate\Support\ServiceProvider;
 
 /** @internal */
-class MoneyServiceProvider extends ServiceProvider
+final class MoneyServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
